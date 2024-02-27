@@ -12,7 +12,7 @@
 struct flag_32bit flag_PROJ_CTL;
 #define FLAG_PROJ_TIMER_PERIOD_1000MS                 	(flag_PROJ_CTL.bit0)
 #define FLAG_PROJ_CAN_TX                      			(flag_PROJ_CTL.bit1)
-#define FLAG_PROJ_REVERSE2                 				(flag_PROJ_CTL.bit2)
+#define FLAG_PROJ_CAN_TX_REMOTE           				(flag_PROJ_CTL.bit2)
 #define FLAG_PROJ_REVERSE3                              (flag_PROJ_CTL.bit3)
 #define FLAG_PROJ_REVERSE4                              (flag_PROJ_CTL.bit4)
 #define FLAG_PROJ_REVERSE5                              (flag_PROJ_CTL.bit5)
@@ -68,6 +68,15 @@ struct flag_32bit flag_PROJ_CTL;
 
 #define CAN_ID_RX2                                      (0x707)
 #define MSG_ID_RX2                                      (MSG(31))
+
+#define CAN_ID_RX3                                      (0x783)
+#define MSG_ID_RX3                                      (MSG(30))
+
+#define CAN_ID_RX4                                      (0x784)
+#define MSG_ID_RX4                                      (MSG(29))
+
+#define CAN_ID_TX_REMOTE                                (0x7EE)
+#define MSG_ID_TX_REMOTE                                (MSG(3))
 
 /*_____ D E F I N I T I O N S ______________________________________________*/
 
@@ -356,7 +365,9 @@ void CAN_MsgInterrupt(CAN_T *tCAN, uint32_t u32IIDR)
 
     printf("msgID : %d(0x%02X,0x%08X),cnt=%d\r\n",msgID ,msgID ,u32IIDR , cnt++);
     if ((msgID == 0 ) |
-        (msgID == 5 ) | 
+        (msgID == 5 ) |
+        (msgID == 29) | 
+        (msgID == 30) | 
         (msgID == 31) )
     {
         printf("Msg-%d INT and Callback\r\n" , msgID);
@@ -464,6 +475,8 @@ void CAN_SetRXFilter(void)
 
     CAN_SetRxMsg(CAN0, MSG_ID_RX1, CAN_STD_ID, CAN_ID_RX1);
     CAN_SetRxMsg(CAN0, MSG_ID_RX2, CAN_STD_ID, CAN_ID_RX2);
+    CAN_SetRxMsg(CAN0, MSG_ID_RX3, CAN_STD_ID, CAN_ID_RX3);
+    CAN_SetRxMsg(CAN0, MSG_ID_RX4, CAN_STD_ID, CAN_ID_RX4);
 
     /*
         if ID bit0/bit1/... is zero , will ignore , and receive the ID data
@@ -579,6 +592,23 @@ uint8_t CAN_data_packing(void)
 }
 
 
+void CAN_Remote_Frame_Send_Set(void)
+{
+    STR_CANMSG_T tMsg;
+
+	tMsg.FrameType= CAN_REMOTE_FRAME;
+	tMsg.IdType   = CAN_STD_ID;
+	tMsg.Id       = CAN_ID_TX_REMOTE;
+	tMsg.DLC      = 0;
+
+	if(CAN_Transmit(CAN0, MSG_ID_TX_REMOTE,&tMsg) == FALSE)   // Configure Msg RAM and send the Msg in the RAM
+	{
+		printf("Set Tx Msg Object failed\n");
+		return;
+	}		
+}
+
+
 void TMR1_IRQHandler(void)
 {
 	
@@ -631,6 +661,12 @@ void loop(void)
         CAN_data_packing();
     }
 
+    if (FLAG_PROJ_CAN_TX_REMOTE)
+    {
+        FLAG_PROJ_CAN_TX_REMOTE = 0;
+        CAN_Remote_Frame_Send_Set();
+    }
+
     Busoff_Recovery();
 }
 
@@ -650,6 +686,9 @@ void UARTx_Process(void)
 		{
 			case '1':
                 FLAG_PROJ_CAN_TX = 1;
+				break;
+			case '2':
+                FLAG_PROJ_CAN_TX_REMOTE = 1;
 				break;
 
 			case 'X':
